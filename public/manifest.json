@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "Zoho Quartz Screen Recorder",
+  "version": "1.0",
+  "description": "Record screen and capture logs for issue debugging.",
+  "permissions": [
+    "tabs",
+    "storage",
+    "activeTab",
+    "background",
+    "debugger",
+    "webNavigation",
+    "scripting",
+    "desktopCapture",
+    "idle",
+    "tabCapture",
+    "declarativeNetRequest",
+    "declarativeContent"
+  ],
+  "host_permissions": [
+    "*://*.zoho.com/*",
+    "*://*.zoho.in/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_icon": "icons/icons8-bug-100.png"
+  }
+}
