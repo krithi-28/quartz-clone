@@ -120,7 +120,7 @@ export default {
 
   // Create and save ZIP
   zip.generateAsync({ type: "blob" }).then((content) => {
-    const zipFileName = `Activity_Capture_${timestamp}.zip`;
+    const zipFileName = `Activity_Capture_${readableTime}.zip`;
     saveAs(content, zipFileName);
 
     message.success("Download complete!");

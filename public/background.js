@@ -72,7 +72,6 @@ function isValidZohoTarget(target, activeTabId, activeTabUrl) {
   const isSameTab = target.tabId === activeTabId;
 
   const activeOrigin = new URL(activeTabUrl).origin;
-a
   const isTrustedWidget = !target.tabId &&
     (target.type === "iframe" || target.type === "other") &&
     (
@@ -321,14 +320,14 @@ function processLogQueue() {
 }
 
 // Main debugger listener
-chrome.debugger.onEvent.addListener((debuggeeId, method, params) => {
+chrome.debugger.onEvent.addListener(async(debuggeeId, method, params) => {
   if (!attachedTargets.includes(debuggeeId.targetId)) return;
 
   // ✅ Console logs
   if (
     method === "Console.messageAdded" ||
     method === "Runtime.consoleAPICalled" ||
-    method === "Log.entryAdded"
+    method === "Log.entryAdded" 
   ) {
     const logEntry = params.message || params.entry || params;
     let messageText = "";
@@ -349,9 +348,69 @@ chrome.debugger.onEvent.addListener((debuggeeId, method, params) => {
     saveLogToStorage({
       level: logEntry.level || "log",
       text: messageText,
+      timestamp: new Date().toLocaleString(),
+    });
+  }
+
+  async function getObjectProperties(debuggeeId, objectId, depth = 1) {
+    return new Promise((resolve) => {
+      chrome.debugger.sendCommand(debuggeeId, "Runtime.getProperties", {
+        objectId: objectId,
+        ownProperties: true
+      }, async (response) => {
+        if (chrome.runtime.lastError) {
+          return resolve({ error: chrome.runtime.lastError.message });
+        }
+  
+        const result = {};
+  
+        for (const prop of response.result || []) {
+          if (prop.value?.objectId && depth < 3) {
+            // Recursively go deeper into nested objects
+            const nested = await getObjectProperties(debuggeeId, prop.value.objectId, depth + 1);
+            result[prop.name] = nested;
+          } else {
+            result[prop.name] = prop.value?.value ?? prop.value?.description ?? "[Unresolved]";
+          }
+        }
+  
+        resolve(result);
+      });
+    });
+  }
+  
+  if (method === "Runtime.exceptionThrown") {
+    const details = params.exceptionDetails;
+    const exception = details.exception;
+    const targetId = debuggeeId;
+  
+    let messageText = "💥 Uncaught Exception";
+  
+    if (details.text) {
+      messageText += `: ${details.text}`;
+    }
+  
+    if (exception?.objectId) {
+      const extracted = await getObjectProperties(targetId, exception.objectId);
+      if (extracted.error) {
+        messageText += ` → ⚠️ Error extracting exception: ${extracted.error}`;
+      } else {
+        messageText += ` → ${JSON.stringify(extracted, null, 2)}`;
+      }
+    } else {
+      if (exception?.value || exception?.description) {
+        messageText += ` → ${exception.value || exception.description}`;
+      }
+    }
+  
+    saveLogToStorage({
+      level: "error",
+      text: messageText,
       timestamp: new Date().toISOString(),
     });
   }
+  
+  
 
   // 🌐 Request capture
   if (method === "Network.requestWillBeSent") {
